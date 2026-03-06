@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VozTarea">
+<meta name="theme-color" content="#0d0d18">
+<title>VozTarea</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #0d0d18;
+  --s1: #141420;
+  --s2: #1c1c2e;
+  --s3: #242438;
+  --border: #2e2e48;
+  --border2: #3e3e5a;
+  --r: #ff4d6d;
+  --p: #b085f5;
+  --p2: #d4aaff;
+  --b: #48cae4;
+  --g: #06d6a0;
+  --y: #ffd166;
+  --text: #eeeef8;
+  --muted: #7070a0;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html, body {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  overflow-x: hidden;
+}
+
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background:
+    radial-gradient(ellipse 70% 45% at 15% 5%, rgba(176,133,245,.1) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 35% at 85% 85%, rgba(255,77,109,.08) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(72,202,228,.04) 0%, transparent 55%);
+  pointer-events:none; z-index:0;
+}
+
+/* ── LAYOUT ── */
+.app { display:flex; flex-direction:column; min-height:100vh; position:relative; z-index:1; }
+
+.topbar {
+  padding: calc(var(--safe-top) + 14px) 20px 14px;
+  display:flex; align-items:center; gap:12px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(13,13,24,.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  position: sticky; top:0; z-index:100;
+}
+
+.app-icon {
+  width:36px; height:36px;
+  background: linear-gradient(135deg, var(--p), var(--r));
+  border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px; flex-shrink:0;
+  box-shadow: 0 4px 14px rgba(176,133,245,.35);
+}
+
+.app-name {
+  font-family:'Syne',sans-serif; font-weight:800; font-size:1.2rem;
+  background: linear-gradient(90deg, var(--text), var(--p2));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+
+.cloud-badge {
+  margin-left:auto; display:flex; align-items:center; gap:6px;
+  font-size:.65rem; color:var(--g); letter-spacing:.06em;
+}
+
+.cloud-dot { width:6px; height:6px; border-radius:50%; background:var(--g); flex-shrink:0; }
+.cloud-dot.sync { animation: pulse-g 1.5s ease-in-out infinite; }
+@keyframes pulse-g { 50% { opacity:.3; } }
+
+/* ── SCROLL CONTENT ── */
+.scroll-area {
+  flex:1; overflow-y:auto; padding:20px 16px;
+  padding-bottom: calc(var(--safe-bot) + 16px);
+}
+
+/* ── RECORDER CARD ── */
+.rec-card {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius:20px; padding:24px 20px 20px;
+  margin-bottom:24px; position:relative; overflow:hidden;
+}
+.rec-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background: linear-gradient(90deg, transparent, var(--p), transparent);
+}
+
+/* waveform */
+.waveform {
+  display:flex; align-items:center; justify-content:center;
+  gap:3px; height:52px; margin-bottom:22px;
+}
+.wb {
+  width:3px; background:var(--border); border-radius:4px; height:6px;
+  transition:all .1s ease;
+}
+.wb.on {
+  background: linear-gradient(180deg, var(--p2), var(--r));
+  animation: wv var(--d,.8s) ease-in-out infinite alternate;
+  animation-delay: var(--dl,0s);
+}
+@keyframes wv { from{height:3px} to{height:var(--mh,32px)} }
+
+/* btn record */
+.btn-rec {
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  width:100%; padding:16px; border:none; border-radius:14px;
+  font-family:'Syne',sans-serif; font-weight:700; font-size:1rem;
+  cursor:pointer; transition:all .2s ease; letter-spacing:.02em;
+  touch-action:manipulation;
+}
+.btn-rec.idle {
+  background: linear-gradient(135deg, var(--p), var(--r));
+  color:#fff; box-shadow:0 6px 20px rgba(176,133,245,.3);
+}
+.btn-rec.idle:active { transform:scale(.97); }
+.btn-rec.rec {
+  background:var(--r); color:#fff;
+  animation:pulse-rec 1.5s ease-in-out infinite;
+}
+@keyframes pulse-rec {
+  0%,100%{box-shadow:0 0 0 0 rgba(255,77,109,.5)}
+  50%{box-shadow:0 0 0 12px rgba(255,77,109,0)}
+}
+
+.timer-row {
+  display:flex; align-items:center; justify-content:center;
+  gap:8px; margin:12px 0; display:none;
+}
+.timer-row.show { display:flex; }
+.timer-dot { width:8px; height:8px; border-radius:50%; background:var(--r); animation:pulse-g 1s infinite; }
+.timer-val { font-family:'Syne',sans-serif; font-size:1rem; font-weight:700; color:var(--r); }
+
+/* transcript */
+.transcript-wrap {
+  margin-top:16px; border:1px solid var(--border); border-radius:12px;
+  overflow:hidden; display:none;
+}
+.transcript-wrap.show { display:block; }
+.transcript-label {
+  padding:8px 14px; background:var(--s2);
+  font-size:.6rem; text-transform:uppercase; letter-spacing:.1em; color:var(--muted);
+  border-bottom:1px solid var(--border);
+}
+.transcript-ta {
+  width:100%; background:transparent; border:none; outline:none;
+  color:var(--text); font-family:'DM Mono',monospace; font-size:.875rem;
+  line-height:1.6; resize:none; padding:12px 14px; min-height:52px;
+}
+.transcript-ta::placeholder { color:var(--muted); }
+
+/* action buttons */
+.action-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px;
+}
+.btn-sm {
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  padding:12px 14px; border-radius:12px; border:1px solid var(--border);
+  background:var(--s2); color:var(--text); font-family:'DM Mono',monospace;
+  font-size:.8rem; cursor:pointer; transition:all .15s ease; touch-action:manipulation;
+}
+.btn-sm:active { transform:scale(.96); }
+.btn-sm.save { border-color:var(--g); color:var(--g); }
+.btn-sm.save:active { background:rgba(6,214,160,.1); }
+.btn-sm.ai { border-color:var(--p); color:var(--p); }
+.btn-sm.ai:active { background:rgba(176,133,245,.1); }
+.btn-sm:disabled { opacity:.35; pointer-events:none; }
+
+/* notice */
+.notice {
+  margin-top:12px; padding:10px 14px;
+  background:rgba(255,209,102,.07); border:1px solid rgba(255,209,102,.2);
+  border-radius:10px; font-size:.72rem; color:var(--y); line-height:1.5;
+  display:none;
+}
+.notice.show { display:block; }
+
+/* ── TASKS ── */
+.section-head {
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;
+}
+.section-title {
+  font-family:'Syne',sans-serif; font-size:.8rem; font-weight:700;
+  color:var(--muted); text-transform:uppercase; letter-spacing:.12em;
+}
+.badge {
+  padding:3px 10px; border-radius:20px;
+  background:var(--s2); border:1px solid var(--border);
+  font-size:.7rem; color:var(--p2);
+}
+
+.tabs {
+  display:flex; gap:6px; margin-bottom:16px; overflow-x:auto;
+  scrollbar-width:none; -webkit-overflow-scrolling:touch;
+}
+.tabs::-webkit-scrollbar { display:none; }
+.tab {
+  padding:7px 16px; border-radius:20px; border:1px solid var(--border);
+  background:transparent; color:var(--muted); font-family:'DM Mono',monospace;
+  font-size:.72rem; cursor:pointer; transition:all .15s ease;
+  white-space:nowrap; touch-action:manipulation;
+}
+.tab.on { background:var(--s2); border-color:var(--p); color:var(--p2); }
+
+/* task card */
+.task {
+  background:var(--s1); border:1px solid var(--border); border-radius:14px;
+  padding:16px; margin-bottom:10px; display:flex; gap:12px; align-items:flex-start;
+  transition:all .2s ease; animation:slideIn .3s ease;
+}
+@keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+.task:active { border-color:var(--border2); }
+.task.done { opacity:.5; }
+.task.done .task-text { text-decoration:line-through; color:var(--muted); }
+
+.chk {
+  width:22px; height:22px; border-radius:7px; border:2px solid var(--border);
+  cursor:pointer; flex-shrink:0; margin-top:1px;
+  display:flex; align-items:center; justify-content:center;
+  transition:all .15s ease; touch-action:manipulation;
+}
+.chk:active { transform:scale(.9); }
+.chk.on { background:var(--g); border-color:var(--g); }
+.chk.on::after { content:'✓'; color:#0a0a0f; font-size:13px; font-weight:700; }
+
+.task-body { flex:1; min-width:0; }
+.task-text { font-size:.875rem; line-height:1.55; margin-bottom:8px; word-break:break-word; }
+.task-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.task-time { font-size:.65rem; color:var(--muted); }
+.tag {
+  font-size:.62rem; padding:2px 8px; border-radius:10px;
+}
+.tag-v { background:rgba(176,133,245,.15); color:var(--p2); border:1px solid rgba(176,133,245,.25); }
+.tag-t { background:rgba(72,202,228,.12); color:var(--b); border:1px solid rgba(72,202,228,.2); }
+
+.del-btn {
+  background:none; border:none; color:var(--muted); cursor:pointer;
+  font-size:14px; padding:4px 8px; border-radius:8px;
+  transition:all .15s; touch-action:manipulation; flex-shrink:0;
+}
+.del-btn:active { background:rgba(255,77,109,.15); color:var(--r); }
+
+/* empty */
+.empty { text-align:center; padding:50px 20px; color:var(--muted); }
+.empty-ico { font-size:44px; margin-bottom:14px; opacity:.35; }
+.empty-txt { font-size:.8rem; letter-spacing:.05em; }
+
+/* status */
+.status {
+  display:flex; align-items:center; gap:8px;
+  padding:9px 14px; background:var(--s2); border:1px solid var(--border);
+  border-radius:10px; margin-bottom:16px; font-size:.72rem; color:var(--muted);
+}
+.sdot { width:6px; height:6px; border-radius:50%; background:var(--g); flex-shrink:0; }
+.sdot.red { background:var(--r); animation:pulse-g 1.2s infinite; }
+.sdot.yellow { background:var(--y); animation:pulse-g 1.2s infinite; }
+.clear-btn {
+  margin-left:auto; background:none; border:none; color:var(--muted);
+  font-family:'DM Mono',monospace; font-size:.65rem; cursor:pointer; letter-spacing:.05em;
+}
+.clear-btn:active { color:var(--r); }
+
+/* ── PWA INSTALL BANNER ── */
+.install-banner {
+  display:none; align-items:center; gap:12px;
+  padding:12px 16px; margin:0 16px 16px;
+  background:var(--s2); border:1px solid var(--p);
+  border-radius:14px; animation:slideIn .4s ease;
+}
+.install-banner.show { display:flex; }
+.install-text { flex:1; font-size:.75rem; line-height:1.4; color:var(--p2); }
+.install-text strong { font-family:'Syne',sans-serif; display:block; margin-bottom:2px; }
+.btn-install {
+  padding:8px 16px; border-radius:10px;
+  background:linear-gradient(135deg, var(--p), var(--r));
+  border:none; color:#fff; font-family:'Syne',sans-serif;
+  font-weight:700; font-size:.8rem; cursor:pointer; white-space:nowrap;
+  touch-action:manipulation;
+}
+
+/* spinner */
+.spinner {
+  width:16px; height:16px; border:2px solid rgba(176,133,245,.3);
+  border-top-color:var(--p); border-radius:50%; animation:spin .7s linear infinite;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.step-label {
+  font-size:.62rem; text-transform:uppercase; letter-spacing:.12em;
+  color:var(--p2); margin-bottom:14px; text-align:center;
+  font-family:'Syne',sans-serif; font-weight:600;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="app-icon">🎙️</div>
+    <span class="app-name">VozTarea</span>
+    <div class="cloud-badge">
+      <div class="cloud-dot" id="cloudDot"></div>
+      <span id="cloudLabel">nube</span>
+    </div>
+  </div>
+
+  <!-- INSTALL BANNER -->
+  <div class="install-banner" id="installBanner">
+    <div class="install-text">
+      <strong>Instalar app</strong>
+      Agregá VozTarea a tu pantalla de inicio
+    </div>
+    <button class="btn-install" onclick="installPWA()">Instalar</button>
+    <button class="del-btn" onclick="dismissInstall()">✕</button>
+  </div>
+
+  <div class="scroll-area">
+
+    <!-- RECORDER -->
+    <div class="rec-card">
+
+      <!-- STEP 1: grabar -->
+      <div class="step-label" id="stepLabel">PASO 1 — Grabá tu tarea</div>
+
+      <div class="waveform" id="waveform"></div>
+
+      <button class="btn-rec idle" id="btnRec" onclick="toggleRecord()">
+        <span id="btnIco">🎤</span>
+        <span id="btnTxt">Tocar para GRABAR</span>
+      </button>
+
+      <div class="timer-row" id="timerRow">
+        <div class="timer-dot"></div>
+        <span class="timer-val" id="timerVal">0:00</span>
+        <span style="font-size:.7rem;color:var(--muted)">grabando… tocá para detener</span>
+      </div>
+
+      <!-- STEP 2: editar y guardar (aparece tras grabar o al tocar escribir) -->
+      <div id="step2" style="display:none; margin-top:18px;">
+        <div class="step-label" style="margin-bottom:10px;">PASO 2 — Revisá y guardá</div>
+        <div class="transcript-wrap show" id="transcriptWrap">
+          <div class="transcript-label">✦ tarea transcripta</div>
+          <textarea class="transcript-ta" id="transcriptTa" rows="3" placeholder="El texto aparece aquí mientras hablás…"></textarea>
+        </div>
+        <div class="action-row" style="margin-top:12px; grid-template-columns:1fr;">
+          <button class="btn-sm save" id="btnSave" onclick="saveTask()">
+            ＋ Guardar tarea en la nube
+          </button>
+        </div>
+      </div>
+
+      <!-- link para escribir directamente sin grabar -->
+      <div style="text-align:center; margin-top:14px;">
+        <button onclick="showStep2Manual()" style="background:none;border:none;color:var(--muted);font-family:'DM Mono',monospace;font-size:.72rem;cursor:pointer;letter-spacing:.05em;text-decoration:underline;">
+          ✍️ O escribí la tarea directamente
+        </button>
+      </div>
+
+      <div class="notice" id="notice">
+        ⚠️ La transcripción automática requiere una API key. Escribí la tarea a mano en el campo de arriba.
+      </div>
+    </div>
+
+    <!-- TASK LIST -->
+    <div class="section-head">
+      <span class="section-title">Registro compartido</span>
+      <span class="badge" id="badge">—</span>
+    </div>
+
+    <div class="tabs">
+      <button class="tab on" onclick="setFilter('all',this)">Todas</button>
+      <button class="tab" onclick="setFilter('pending',this)">Pendientes</button>
+      <button class="tab" onclick="setFilter('done',this)">Hechas</button>
+    </div>
+
+    <div class="status">
+      <div class="sdot" id="sDot"></div>
+      <span id="sText">Cargando…</span>
+      <button class="clear-btn" onclick="clearDone()">Limpiar hechas</button>
+    </div>
+
+    <div id="taskList"><div class="empty"><div class="empty-ico">☁️</div><div class="empty-txt">Cargando tareas…</div></div></div>
+
+  </div>
+</div>
+
+<!-- SERVICE WORKER inline -->
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────
+const API_KEY = ''; // Opcional: Anthropic API key para transcripción automática
+const STORAGE_KEY = 'voztarea_shared_tasks';
+const POLL_INTERVAL = 8000; // refresca cada 8 seg
+
+// ── STATE ───────────────────────────────────────────────────────
+let tasks = [];
+let filter = 'all';
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let timerInt = null;
+let secs = 0;
+let audioBlob = null;
+let deferredPrompt = null;
+let pollTimer = null;
+
+// ── WAVEFORM ────────────────────────────────────────────────────
+const BARS = 28;
+const wvEl = document.getElementById('waveform');
+for(let i=0;i<BARS;i++){
+  const b = document.createElement('div');
+  b.className='wb';
+  b.style.setProperty('--d',(0.4+Math.random()*.7).toFixed(2)+'s');
+  b.style.setProperty('--dl',(Math.random()*.4).toFixed(2)+'s');
+  b.style.setProperty('--mh',(10+Math.random()*38).toFixed(0)+'px');
+  wvEl.appendChild(b);
+}
+const waveOn = on => document.querySelectorAll('.wb').forEach(b=>b.classList.toggle('on',on));
+
+// ── PWA INSTALL ─────────────────────────────────────────────────
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferredPrompt = e;
+  document.getElementById('installBanner').classList.add('show');
+});
+
+function installPWA(){
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; dismissInstall(); });
+}
+function dismissInstall(){
+  document.getElementById('installBanner').classList.remove('show');
+}
+
+// iOS install hint
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = window.navigator.standalone;
+if(isIOS && !isStandalone){
+  const b = document.getElementById('installBanner');
+  b.querySelector('.install-text').innerHTML = '<strong>Instalar en iPhone</strong>Tocá Compartir → "Agregar a inicio"';
+  b.querySelector('.btn-install').style.display='none';
+  b.classList.add('show');
+}
+
+// ── CLOUD STORAGE (shared via artifact storage API) ──────────────
+async function loadTasks(){
+  setCloud('sync');
+  try {
+    const result = await window.storage.get(STORAGE_KEY, true); // shared=true
+    tasks = result ? JSON.parse(result.value) : [];
+  } catch(e) {
+    tasks = [];
+  }
+  renderTasks();
+  setCloud('ok');
+  setStatus('Sincronizado ✓');
+}
+
+async function saveTasks(){
+  setCloud('sync');
+  try {
+    await window.storage.set(STORAGE_KEY, JSON.stringify(tasks), true); // shared=true
+    setCloud('ok');
+    setStatus('Guardado en la nube ✓');
+  } catch(e) {
+    setCloud('err');
+    setStatus('Error al guardar', true);
+  }
+}
+
+function startPolling(){
+  if(pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(loadTasks, POLL_INTERVAL);
+}
+
+// ── WEB SPEECH API ───────────────────────────────────────────────
+let recognition = null;
+let accumulatedText = ''; // texto final acumulado entre sesiones
+
+function initSpeech(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR) return null;
+  const r = new SR();
+  r.lang = 'es-AR';
+  r.continuous = false;      // una frase a la vez — evita repeticiones
+  r.interimResults = false;  // solo resultados finales — sin texto parcial duplicado
+  r.maxAlternatives = 1;
+
+  r.onresult = e => {
+    const nuevaFrase = e.results[0][0].transcript.trim();
+    accumulatedText = accumulatedText ? accumulatedText + ' ' + nuevaFrase : nuevaFrase;
+    document.getElementById('transcriptTa').value = accumulatedText;
+  };
+
+  r.onerror = e => {
+    if(e.error === 'no-speech') {
+      // silencio — reiniciar si sigue grabando
+      if(isRecording) r.start();
+      return;
+    }
+    if(e.error === 'not-allowed'){
+      alert('Permiso de micrófono denegado. Habilitalo en la configuración del navegador.');
+      stopRec();
+      return;
+    }
+    // otros errores: reiniciar
+    if(isRecording) setTimeout(()=>{ try{ r.start(); }catch(e){} }, 200);
+  };
+
+  r.onend = () => {
+    // reiniciar automáticamente mientras siga grabando
+    if(isRecording) {
+      try { r.start(); } catch(e) {}
+    }
+  };
+
+  return r;
+}
+
+// ── RECORD ───────────────────────────────────────────────────────
+async function toggleRecord(){
+  if(!isRecording) await startRec();
+  else stopRec();
+}
+
+async function startRec(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    alert('Tu navegador no soporta reconocimiento de voz.\nUsá Chrome en Android o Safari en iPhone.');
+    return;
+  }
+  accumulatedText = '';
+  document.getElementById('transcriptTa').value = '';
+  document.getElementById('step2').style.display = 'block';
+  document.getElementById('stepLabel').textContent = '🎤 Hablá — se transcribe al terminar cada frase';
+
+  recognition = initSpeech();
+  try {
+    recognition.start();
+    isRecording = true;
+    document.getElementById('btnRec').className='btn-rec rec';
+    document.getElementById('btnIco').textContent='⏹';
+    document.getElementById('btnTxt').textContent='Tocar para DETENER';
+    document.getElementById('timerRow').classList.add('show');
+    setStatus('🔴 Escuchando… hablá tu tarea', false, 'red');
+    waveOn(true);
+    secs=0;
+    timerInt = setInterval(()=>{
+      secs++;
+      const m=Math.floor(secs/60), s=secs%60;
+      document.getElementById('timerVal').textContent=`${m}:${s.toString().padStart(2,'0')}`;
+    },1000);
+  } catch(e){
+    setStatus('Error al iniciar el micrófono', false, 'red');
+  }
+}
+
+function stopRec(){
+  isRecording = false; // primero, para que onend no reinicie
+  if(recognition){ try{ recognition.stop(); }catch(e){} recognition = null; }
+  clearInterval(timerInt);
+  document.getElementById('btnRec').className='btn-rec idle';
+  document.getElementById('btnIco').textContent='🎤';
+  document.getElementById('btnTxt').textContent='Tocar para GRABAR';
+  document.getElementById('timerRow').classList.remove('show');
+  document.getElementById('stepLabel').textContent='PASO 2 — Revisá y guardá';
+  waveOn(false);
+  const txt = document.getElementById('transcriptTa').value.trim();
+  if(txt) setStatus('Transcripción lista ✓ — revisá y guardá');
+  else setStatus('No se detectó voz — intentá de nuevo o escribí a mano');
+}
+
+function processAudio(){ /* no usado */ }
+
+function setAILoading(on){
+  document.getElementById('aiSpinner').style.display = on ? 'block':'none';
+  document.getElementById('aiTxt').style.display = on ? 'none':'inline';
+  document.getElementById('btnAI').disabled = on;
+}
+
+function blobToB64(blob){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=rej;
+    r.readAsDataURL(blob);
+  });
+}
+
+// ── SAVE TASK ────────────────────────────────────────────────────
+async function saveTask(){
+  const text = document.getElementById('transcriptTa').value.trim();
+  if(!text){ setStatus('Escribí o grabá una tarea primero', false, 'yellow'); return; }
+  const task = {
+    id: Date.now(),
+    text,
+    source: audioBlob ? 'voice' : 'text',
+    done: false,
+    createdAt: new Date().toISOString()
+  };
+  tasks.unshift(task);
+  renderTasks();
+  await saveTasks();
+  clearInput();
+}
+
+function clearInput(){
+  document.getElementById('transcriptTa').value='';
+  showTranscript(false);
+  audioBlob=null;
+  document.getElementById('btnAI').disabled=true;
+  document.getElementById('notice').classList.remove('show');
+}
+
+// ── TASK ACTIONS ─────────────────────────────────────────────────
+async function toggleDone(id){
+  tasks = tasks.map(t => t.id===id ? {...t, done:!t.done} : t);
+  renderTasks();
+  await saveTasks();
+}
+
+async function deleteTask(id){
+  tasks = tasks.filter(t => t.id!==id);
+  renderTasks();
+  await saveTasks();
+}
+
+async function clearDone(){
+  const done = tasks.filter(t=>t.done).length;
+  if(!done){ setStatus('No hay tareas completadas'); return; }
+  if(!confirm(`¿Eliminar ${done} tarea(s) completada(s)?`)) return;
+  tasks = tasks.filter(t=>!t.done);
+  renderTasks();
+  await saveTasks();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────
+function renderTasks(){
+  const list = document.getElementById('taskList');
+  let filtered = tasks;
+  if(filter==='pending') filtered = tasks.filter(t=>!t.done);
+  if(filter==='done')    filtered = tasks.filter(t=>t.done);
+
+  const pending = tasks.filter(t=>!t.done).length;
+  document.getElementById('badge').textContent = `${pending} pendiente${pending!==1?'s':''}`;
+
+  if(!filtered.length){
+    const msgs = {all:'Sin tareas aún — ¡grabá la primera!', pending:'Todo al día 🎉', done:'Ninguna completada aún'};
+    list.innerHTML=`<div class="empty"><div class="empty-ico">${filter==='done'?'✅':filter==='pending'?'🎉':'📋'}</div><div class="empty-txt">${msgs[filter]}</div></div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(t=>{
+    const d = new Date(t.createdAt);
+    const ds = d.toLocaleDateString('es-AR',{day:'2-digit',month:'short'});
+    const ts = d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    return `
+    <div class="task ${t.done?'done':''}" id="tk${t.id}">
+      <div class="chk ${t.done?'on':''}" onclick="toggleDone(${t.id})"></div>
+      <div class="task-body">
+        <div class="task-text">${esc(t.text)}</div>
+        <div class="task-meta">
+          <span class="task-time">📅 ${ds} · ${ts}</span>
+          <span class="tag ${t.source==='voice'?'tag-v':'tag-t'}">${t.source==='voice'?'🎙 voz':'⌨ texto'}</span>
+        </div>
+      </div>
+      <button class="del-btn" onclick="deleteTask(${t.id})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function setFilter(f, el){
+  filter=f;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  renderTasks();
+}
+
+// ── UI HELPERS ───────────────────────────────────────────────────
+function showTranscript(show){ /* kept for compat */ }
+
+function showStep2Manual(){
+  document.getElementById('step2').style.display='block';
+  document.getElementById('stepLabel').textContent='Escribí tu tarea';
+  document.getElementById('transcriptTa').value='';
+  setTimeout(()=>document.getElementById('transcriptTa').focus(), 100);
+}
+
+function clearInput(){
+  document.getElementById('transcriptTa').value='';
+  document.getElementById('step2').style.display='none';
+  document.getElementById('stepLabel').textContent='PASO 1 — Grabá tu tarea';
+  audioBlob=null;
+  document.getElementById('notice').classList.remove('show');
+}
+
+function setStatus(msg, err=false, dot=''){
+  document.getElementById('sText').textContent=msg;
+  const d=document.getElementById('sDot');
+  d.className='sdot'+(dot?' '+dot:'');
+}
+
+function setCloud(state){
+  const dot=document.getElementById('cloudDot');
+  const lbl=document.getElementById('cloudLabel');
+  if(state==='sync'){ dot.classList.add('sync'); lbl.textContent='sincronizando'; }
+  else if(state==='ok'){ dot.classList.remove('sync'); dot.style.background='var(--g)'; lbl.textContent='nube ✓'; }
+  else { dot.classList.remove('sync'); dot.style.background='var(--r)'; lbl.textContent='sin conexión'; }
+}
+
+// ── INIT ────────────────────────────────────────────────────────
+loadTasks().then(startPolling);
+
+// ── SERVICE WORKER ──────────────────────────────────────────────
+if('serviceWorker' in navigator){
+  const swCode = `
+    const CACHE='voztarea-v1';
+    const ASSETS=['/'];
+    self.addEventListener('install', e=>{
+      e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));
+    });
+    self.addEventListener('fetch', e=>{
+      e.respondWith(
+        caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('/')))
+      );
+    });
+  `;
+  const blob = new Blob([swCode],{type:'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url).catch(()=>{});
+}
+</script>
+</body>
+</html>
