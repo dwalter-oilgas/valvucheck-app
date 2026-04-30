@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ManguerCheck - Calibración de Manguerotes</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #2E7D32; --primary-dark: #1B5E20;
+            --secondary: #004E89; --accent: #00D9FF;
+            --dark: #1A1A2E; --light: #F8F9FA;
+            --success: #06D6A0; --warning: #FFB800;
+            --danger: #EF476F; --border: #E0E0E0;
+            --shadow: rgba(0,0,0,0.08);
+            --gradient: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
+        }
+        body { font-family: 'Manrope', sans-serif; background: linear-gradient(180deg, #F8F9FA 0%, #E8EEF2 100%); color: var(--dark); min-height: 100vh; }
+        .app-container { max-width: 900px; margin: 0 auto; padding: 20px; padding-bottom: 80px; }
+        .app-header { background: var(--gradient); border-radius: 20px; padding: 30px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(46,125,50,0.2); position: relative; overflow: hidden; }
+        .app-header::before { content: ''; position: absolute; top: -50%; right: -20%; width: 300px; height: 300px; background: rgba(255,255,255,0.1); border-radius: 50%; }
+        .app-header h1 { color: white; font-size: 32px; font-weight: 800; margin-bottom: 8px; position: relative; z-index: 1; }
+        .app-header .subtitle { color: rgba(255,255,255,0.9); font-size: 16px; font-weight: 500; position: relative; z-index: 1; }
+        .sync-status { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); padding: 8px 16px; border-radius: 20px; color: white; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; z-index: 2; }
+        .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+        .nav-tabs { display: flex; gap: 12px; margin-bottom: 30px; background: white; padding: 8px; border-radius: 16px; box-shadow: 0 4px 20px var(--shadow); }
+        .nav-tab { flex: 1; padding: 14px 20px; border: none; background: transparent; color: var(--dark); font-weight: 600; font-size: 15px; border-radius: 12px; cursor: pointer; transition: all 0.3s ease; font-family: 'Manrope', sans-serif; }
+        .nav-tab.active { background: var(--gradient); color: white; box-shadow: 0 4px 12px rgba(46,125,50,0.3); }
+        .card { background: white; border-radius: 20px; padding: 30px; margin-bottom: 20px; box-shadow: 0 4px 20px var(--shadow); animation: fadeInUp 0.5s ease; }
+        @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+        .card-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; color: var(--dark); display: flex; align-items: center; gap: 10px; }
+        .card-title::before { content: ''; width: 4px; height: 24px; background: var(--gradient); border-radius: 2px; }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; font-weight: 600; margin-bottom: 8px; color: var(--dark); font-size: 14px; }
+        .form-input { width: 100%; padding: 14px 16px; border: 2px solid var(--border); border-radius: 12px; font-size: 15px; font-family: 'Manrope', sans-serif; transition: all 0.3s ease; background: white; }
+        .form-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(46,125,50,0.1); }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .btn { padding: 16px 32px; border: none; border-radius: 12px; font-weight: 700; font-size: 16px; cursor: pointer; transition: all 0.3s ease; font-family: 'Manrope', sans-serif; display: inline-flex; align-items: center; gap: 8px; justify-content: center; }
+        .btn-primary { background: var(--gradient); color: white; box-shadow: 0 4px 16px rgba(46,125,50,0.3); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(46,125,50,0.4); }
+        .btn-secondary { background: white; color: var(--dark); border: 2px solid var(--border); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-full { width: 100%; }
+        .order-card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 12px; border-left: 4px solid var(--primary); box-shadow: 0 4px 12px var(--shadow); cursor: pointer; transition: all 0.3s ease; }
+        .order-card:hover { transform: translateX(4px); box-shadow: 0 6px 16px var(--shadow); }
+        .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .order-title { font-weight: 700; font-size: 18px; color: var(--dark); }
+        .order-badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+        .badge-complete { background: rgba(6,214,160,0.2); color: var(--success); }
+        .badge-draft { background: rgba(255,184,0,0.2); color: var(--warning); }
+        .order-details { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; font-size: 14px; color: #666; }
+        .detail-label { font-weight: 600; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: var(--dark); color: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); animation: slideInRight 0.3s ease; z-index: 1000; font-weight: 600; }
+        @keyframes slideInRight { from { transform:translateX(400px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .btn-group { display: flex; gap: 12px; margin-top: 20px; }
+        .loading { text-align: center; padding: 40px; color: #999; }
+        @media (max-width: 768px) {
+            .form-row { grid-template-columns: 1fr; }
+            .order-details { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+// Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyCROCn8bb41my-b5Yj4anDBqgb-v-SfhB0",
+    authDomain: "valvucheck.firebaseapp.com",
+    projectId: "valvucheck",
+    storageBucket: "valvucheck.firebasestorage.app",
+    messagingSenderId: "550814428039",
+    appId: "1:550814428039:web:9ec559c1a52a2f47340122"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Storage
+const Storage = {
+    getOrders: (cb) => db.collection('manguerotes').onSnapshot(snap => {
+        const orders = [];
+        snap.forEach(doc => orders.push({ ...doc.data(), firestoreId: doc.id }));
+        orders.sort((a, b) => new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
+        cb(orders);
+    }, () => cb([])),
+
+    saveOrder: async (order) => {
+        try {
+            const clean = JSON.parse(JSON.stringify(order, (k,v) => v === undefined ? '' : v));
+            if (order.firestoreId) {
+                await db.collection('manguerotes').doc(order.firestoreId).set(clean);
+            } else {
+                await db.collection('manguerotes').add(clean);
+            }
+            return true;
+        } catch (e) {
+            alert('Error al guardar: ' + e.message);
+            return false;
+        }
+    }
+};
+
+// Toast
+function Toast({ message, type, onClose }) {
+    useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, []);
+    return <div className={`toast ${type}`}>{message}</div>;
+}
+
+// New Order Form
+function NewOrderForm({ onSave, editingOrder }) {
+    const emptyOrder = {
+        id: Date.now(),
+        otNumber: `MT-${Date.now().toString().slice(-6)}`,
+        fecha: new Date().toISOString().split('T')[0],
+        marca: '',
+        serie: '',
+        psi: '',
+        longitud: '',
+        roscaEntrada: '',
+        fechaEntrada: new Date().toISOString().split('T')[0],
+        fechaCalibracion: '',
+        precinto: '',
+        origen: '',
+        destino: '',
+        fechaSalida: '',
+        ov: '',
+        remito: '',
+        observaciones: '',
+        status: 'draft',
+        updatedAt: new Date().toISOString()
+    };
+
+    const [form, setForm] = useState(editingOrder || emptyOrder);
+    const [saving, setSaving] = useState(false);
+
+    const set = (f, v) => setForm(prev => ({ ...prev, [f]: v }));
+
+    const handleSave = async (draft = false) => {
+        setSaving(true);
+        await onSave({ ...form, status: draft ? 'draft' : 'complete', updatedAt: new Date().toISOString() });
+        setSaving(false);
+    };
+
+    const generateCert = () => {
+        const w = window.open('', '_blank');
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Certificado ${form.otNumber}</title>
+<style>
+@page { size: A4; margin: 0; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: Arial, Helvetica, sans-serif; width:210mm; background:white; font-size:11pt; }
+.page { padding:10mm 15mm; page-break-after: always; min-height:297mm; position:relative; }
+
+/* Header exacto del PDF */
+.header-banner { 
+    background: white;
+    border: 3px solid #16697a;
+    display: flex;
+    align-items: center;
+    margin: 0 0 15px 0;
+    height: 65px;
+    position: relative;
+}
+.header-left {
+    flex: 0 0 58%;
+    display: flex;
+    align-items: center;
+    padding: 8px 15px;
+    background: white;
+    gap: 12px;
+}
+.logo-text h1 {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: 2.5px;
+    margin: 0;
+    color: #000;
+    font-family: 'Impact', 'Franklin Gothic Heavy', 'Arial Black', sans-serif;
+    text-transform: uppercase;
+    line-height: 1;
+}
+.logo-text .subtitle {
+    font-size: 10px;
+    font-weight: 600;
+    margin-top: 1px;
+    color: #333;
+    letter-spacing: 0.8px;
+}
+.hexagon {
+    width: 42px;
+    height: 48px;
+    background: #16697a;
+    position: relative;
+    margin: 0 8px;
+    flex-shrink: 0;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+.header-right {
+    flex: 0 0 42%;
+    background: #16697a;
+    color: white;
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    clip-path: polygon(18px 0, 100% 0, 100% 100%, 0 100%);
+    margin-left: -18px;
+}
+.header-right h2 {
+    font-size: 12px;
+    font-weight: 700;
+    text-align: left;
+    margin: 0 0 2px 0;
+    letter-spacing: 0.2px;
+    padding-left: 22px;
+}
+.header-right h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-align: left;
+    margin: 0;
+    padding-left: 22px;
+}
+
+/* Título del certificado */
+.cert-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border: 2px solid #ccc;
+    background: #f8f8f8;
+    padding: 12px 15px;
+    margin-bottom: 20px;
+}
+.cert-title {
+    font-size: 16px;
+    font-weight: 700;
+}
+.cert-meta {
+    text-align: right;
+    font-size: 10px;
+    line-height: 1.6;
+}
+
+/* Sección título principal */
+.main-title {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 25px 0 20px 0;
+    text-decoration: underline;
+    font-style: italic;
+}
+
+/* Tabla de información */
+.info-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+}
+.info-table td {
+    border: 2px solid #17696d;
+    padding: 8px 12px;
+    font-size: 11pt;
+}
+.info-table td:first-child {
+    background: #d4f1f4;
+    font-weight: 600;
+    width: 40%;
+}
+
+/* Headers de equipos */
+.equipo-header {
+    background: #333;
+    color: white;
+    text-align: center;
+    font-weight: 700;
+    padding: 8px;
+    margin-top: 15px;
+    font-size: 11pt;
+}
+
+/* Tabla de checks */
+.check-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+.check-table th,
+.check-table td {
+    border: 2px solid #17696d;
+    padding: 10px;
+    text-align: center;
+    font-size: 11pt;
+}
+.check-table th {
+    background: #d4f1f4;
+    font-weight: 700;
+}
+.check-table td:first-child {
+    text-align: left;
+    background: #f0f9fa;
+}
+.checkmark {
+    font-size: 18px;
+    font-weight: 700;
+    color: #000;
+}
+
+/* Procedimiento */
+.procedimiento {
+    margin: 25px 0;
+}
+.procedimiento h3 {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: underline;
+    font-style: italic;
+    margin-bottom: 15px;
+}
+.procedimiento p {
+    margin: 8px 0;
+    line-height: 1.5;
+}
+
+/* Tabla de resultados */
+.result-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+.result-table th {
+    background: #333;
+    color: white;
+    padding: 8px 6px;
+    border: 2px solid #333;
+    font-weight: 700;
+    font-size: 9pt;
+    text-align: center;
+}
+.result-table td {
+    border: 2px solid #666;
+    padding: 10px 8px;
+    text-align: center;
+    height: 35px;
+    font-size: 10pt;
+}
+
+/* Firmas */
+.signatures {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 60px;
+}
+.signature-box {
+    width: 45%;
+    text-align: center;
+}
+.signature-line {
+    border-top: 2px solid #000;
+    margin-top: 50px;
+    padding-top: 8px;
+    font-size: 11pt;
+    font-weight: 600;
+}
+
+/* Footer */
+.footer {
+    position: absolute;
+    bottom: 8mm;
+    left: 15mm;
+    right: 15mm;
+    text-align: center;
+    font-size: 9pt;
+    color: #333;
+    border-top: 1px solid #ccc;
+    padding-top: 8px;
+}
+
+/* Botón imprimir */
+.no-print {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    background: #17696d;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 14px;
+    border: none;
+    z-index: 999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.no-print:hover {
+    background: #145d60;
+}
+
+.page:last-child { page-break-after: auto; }
+@media print { 
+    .no-print { display: none; }
+    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+</style></head><body>
+
+<!-- PÁGINA 1 -->
+<div class="page">
+    <div class="header-banner">
+        <div class="header-left">
+            <div class="logo-text">
+                <h1>DARIO WALTER</h1>
+                <div class="subtitle">Oil & Gas Solutions</div>
+            </div>
+            <div class="hexagon"></div>
+        </div>
+        <div class="header-right">
+            <h2>PROCEDIMIENTO DE SERVICIO TÉCNICO</h2>
+            <h3>FIELD SERVICE PROCEDURE</h3>
+        </div>
+    </div>
+
+    <div class="cert-header">
+        <div class="cert-title">Certificado de Calibración Manguerote Nº${form.otNumber}</div>
+        <div class="cert-meta">
+            <div>REVISION</div>
+            <div>DATE</div>
+            <div>PAGE 1/3</div>
+        </div>
+    </div>
+
+    <h2 class="main-title">Calibración Manguerotes</h2>
+
+    <table class="info-table">
+        <tr><td>Objeto calibrado:</td><td>Mangueras para Gas Natural Comprimido</td></tr>
+        <tr><td>Fabricante:</td><td>${form.marca || 'ALFAGOMMA'}</td></tr>
+        <tr><td>Modelo:</td><td>${form.longitud || 'FLEXOR 12 – 2"'}</td></tr>
+        <tr><td>Fecha de calibración:</td><td>${form.fechaCalibracion ? new Date(form.fechaCalibracion).toLocaleDateString('es-AR', {month: '2-digit', year: 'numeric'}) : '09/2024'}</td></tr>
+        <tr><td>Calibración efectuada por:</td><td>DARIO WALTER</td></tr>
+        <tr><td>Nº Serie:</td><td>${form.serie || 'S/N'}</td></tr>
+        <tr><td>Próxima fecha de calibración:</td><td>${form.fechaCalibracion ? new Date(new Date(form.fechaCalibracion).setFullYear(new Date(form.fechaCalibracion).getFullYear() + 1)).toLocaleDateString('es-AR', {month: 'long', year: 'numeric'}).toUpperCase() : 'SEPTIEMBRE 2025'}</td></tr>
+        <tr><td>Equipo:</td><td>${form.origen || 'MP 756'}</td></tr>
+        <tr><td>Posición:</td><td>${form.destino || 'SUCCION'}</td></tr>
+    </table>
+
+    <h2 class="main-title">Equipos utilizados en la calibración</h2>
+
+    <div class="equipo-header">MANOMETRO</div>
+    <table class="info-table">
+        <tr><td>Marca:</td><td>ADDITEL</td></tr>
+        <tr><td>Modelo:</td><td>ADT680W-25-GP5K-BAR-N</td></tr>
+        <tr><td>Serial:</td><td>21820150067</td></tr>
+        <tr><td>Certificación:</td><td></td></tr>
+    </table>
+
+    <div class="equipo-header">EQUIPO DE ENSAYO DE PRESIÓN HIDROSTÁTICA</div>
+    <table class="info-table">
+        <tr><td>Marca:</td><td>YUKON</td></tr>
+        <tr><td>Modelo:</td><td>M-000400</td></tr>
+        <tr><td>Serial:</td><td>143-113</td></tr>
+        <tr><td>Certificación:</td><td>IRAM-143</td></tr>
+    </table>
+
+    <div class="footer">
+        Vintter 965 – General Roca – Provincia de Río Negro – República Argentina<br>
+        ✉: C.P.8332 - ☎: 54.298.4332395
+    </div>
+</div>
+
+<!-- PÁGINA 2 -->
+<div class="page">
+    <div class="header-banner">
+        <div class="header-left">
+            <div class="logo-text">
+                <h1>DARIO WALTER</h1>
+                <div class="subtitle">Oil & Gas Solutions</div>
+            </div>
+            <div class="hexagon"></div>
+        </div>
+        <div class="header-right">
+            <h2>PROCEDIMIENTO DE SERVICIO TÉCNICO</h2>
+            <h3>FIELD SERVICE PROCEDURE</h3>
+        </div>
+    </div>
+
+    <div class="cert-header">
+        <div class="cert-title">Certificado de Calibración Manguerote Nº${form.otNumber}</div>
+        <div class="cert-meta">
+            <div>REVISION</div>
+            <div>DATE</div>
+            <div>PAGE 2/3</div>
+        </div>
+    </div>
+
+    <p style="margin:20px 0; font-style:italic;">Nota: Certificado de calibración del manómetro adjunto a este documento.</p>
+
+    <table class="check-table">
+        <thead>
+            <tr>
+                <th style="text-align:left;">Descripción de trabajos</th>
+                <th>Realizado</th>
+                <th>Aprobado</th>
+                <th>Rechazado</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Inspección visual cuerpo principal</td>
+                <td><span class="checkmark">✓</span></td>
+                <td><span class="checkmark">✓</span></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>Inspección visual prensado de conector</td>
+                <td><span class="checkmark">✓</span></td>
+                <td><span class="checkmark">✓</span></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>Inspección visual abocardado</td>
+                <td><span class="checkmark">✓</span></td>
+                <td><span class="checkmark">✓</span></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>Inspección visual roscas</td>
+                <td><span class="checkmark">✓</span></td>
+                <td><span class="checkmark">✓</span></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>Prueba hidrostática</td>
+                <td><span class="checkmark">✓</span></td>
+                <td><span class="checkmark">✓</span></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td>Estampado Nº de precinto</td>
+                <td><span class="checkmark">✓</span></td>
+                <td><span class="checkmark">✓</span></td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="procedimiento">
+        <h3>Procedimiento</h3>
+        <p>Una vez por año se desmonta y se lleva a celda de presión.</p>
+        <p><strong>1-</strong> Una vez en celda, realizar inspección visual.</p>
+        <p><strong>2-</strong> Si esta desgastada la pared mecánicamente se descarta.</p>
+        <p><strong>3-</strong> Si esta integro, se lo somete a máxima presión de trabajo por 20 minutos.</p>
+        <p><strong>4-</strong> Luego precintar con lote y partida para dentro de 1 año volver a hacer el procedimiento.</p>
+    </div>
+
+    <div class="footer">
+        Vintter 965 – General Roca – Provincia de Río Negro – República Argentina<br>
+        ✉: C.P.8332 - ☎: 54.298.4332395
+    </div>
+</div>
+
+<!-- PÁGINA 3 -->
+<div class="page">
+    <div class="header-banner">
+        <div class="header-left">
+            <div class="logo-text">
+                <h1>DARIO WALTER</h1>
+                <div class="subtitle">Oil & Gas Solutions</div>
+            </div>
+            <div class="hexagon"></div>
+        </div>
+        <div class="header-right">
+            <h2>PROCEDIMIENTO DE SERVICIO TÉCNICO</h2>
+            <h3>FIELD SERVICE PROCEDURE</h3>
+        </div>
+    </div>
+
+    <div class="cert-header">
+        <div class="cert-title">Certificado de Calibración Manguerote Nº${form.otNumber}</div>
+        <div class="cert-meta">
+            <div>REVISION</div>
+            <div>DATE</div>
+            <div>PAGE 3/3</div>
+        </div>
+    </div>
+
+    <h3 style="margin:30px 0 20px 0; text-decoration:underline; font-style:italic; font-size:14pt;">Resultados de medición:</h3>
+
+    <table class="result-table">
+        <thead>
+            <tr>
+                <th>UBICACIÓN</th>
+                <th>MARCA</th>
+                <th>MODELO</th>
+                <th>N° SERIE</th>
+                <th>Presión de<br>operación</th>
+                <th>Presión de<br>prueba</th>
+                <th>Tiempo de<br>prueba</th>
+                <th>Precinto</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>${form.destino || ''}</td>
+                <td>${form.marca || 'ALFAGOMMA'}</td>
+                <td>${form.longitud || 'FLEXOR 12 – 2"'}</td>
+                <td>${form.serie || ''}</td>
+                <td>${form.psi ? form.psi + ' BAR' : '11 BAR'}</td>
+                <td>${form.psi ? (parseFloat(form.psi) * 15.73).toFixed(0) + ' BAR' : '173 BAR'}</td>
+                <td>20 MIN</td>
+                <td>${form.precinto || ''}</td>
+            </tr>
+            <tr style="height:40px;">
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+            </tr>
+            <tr style="height:40px;">
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+            </tr>
+            <tr style="height:40px;">
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+            </tr>
+            <tr style="height:40px;">
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="signatures">
+        <div class="signature-box">
+            <div class="signature-line">Responsable certificación</div>
+        </div>
+        <div class="signature-box">
+            <div class="signature-line">Responsable taller de prueba</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Vintter 965 – General Roca – Provincia de Río Negro – República Argentina<br>
+        ✉: C.P.8332 - ☎: 54.298.4332395
+    </div>
+</div>
+
+<button class="no-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+</body></html>`;
+        w.document.write(html);
+        w.document.close();
+    };
+
+    return (
+        <div>
+            <div className="card">
+                <div className="card-title">📋 Datos del Manguerote</div>
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="form-label">N° OT</label>
+                        <input className="form-input" value={form.otNumber} readOnly style={{background:'#f5f5f5'}} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Fecha</label>
+                        <input type="date" className="form-input" value={form.fecha} onChange={e => set('fecha', e.target.value)} />
+                    </div>
+                </div>
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="form-label">Marca</label>
+                        <input className="form-input" value={form.marca} onChange={e => set('marca', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">N° Serie</label>
+                        <input className="form-input" value={form.serie} onChange={e => set('serie', e.target.value)} />
+                    </div>
+                </div>
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="form-label">PSI</label>
+                        <input className="form-input" value={form.psi} onChange={e => set('psi', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Longitud</label>
+                        <input className="form-input" value={form.longitud} onChange={e => set('longitud', e.target.value)} />
+                    </div>
+                </div>
+                <div className="form-group">
+                    <label className="form-label">Rosca Entrada</label>
+                    <input className="form-input" value={form.roscaEntrada} onChange={e => set('roscaEntrada', e.target.value)} />
+                </div>
+            </div>
+
+            <div className="card">
+                <div className="card-title">📅 Fechas</div>
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="form-label">Fecha de Entrada</label>
+                        <input type="date" className="form-input" value={form.fechaEntrada} onChange={e => set('fechaEntrada', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Fecha de Calibración</label>
+                        <input type="date" className="form-input" value={form.fechaCalibracion} onChange={e => set('fechaCalibracion', e.target.value)} />
+                    </div>
+                </div>
+                <div className="form-group">
+                    <label className="form-label">Fecha de Salida</label>
+                    <input type="date" className="form-input" value={form.fechaSalida} onChange={e => set('fechaSalida', e.target.value)} />
+                </div>
+            </div>
+
+            <div className="card">
+                <div className="card-title">🏭 Destino y Documentación</div>
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="form-label">Origen</label>
+                        <input className="form-input" value={form.origen} onChange={e => set('origen', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Destino</label>
+                        <input className="form-input" value={form.destino} onChange={e => set('destino', e.target.value)} />
+                    </div>
+                </div>
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="form-label">Precinto</label>
+                        <input className="form-input" value={form.precinto} onChange={e => set('precinto', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Orden de Venta</label>
+                        <input className="form-input" value={form.ov} onChange={e => set('ov', e.target.value)} />
+                    </div>
+                </div>
+                <div className="form-group">
+                    <label className="form-label">Remito</label>
+                    <input className="form-input" value={form.remito} onChange={e => set('remito', e.target.value)} />
+                </div>
+                <div className="form-group">
+                    <label className="form-label">Observaciones</label>
+                    <textarea className="form-input" style={{minHeight:'100px',resize:'vertical'}} value={form.observaciones} onChange={e => set('observaciones', e.target.value)} />
+                </div>
+            </div>
+
+            <div className="btn-group">
+                <button className="btn btn-secondary" style={{flex:1}} onClick={() => handleSave(true)} disabled={saving}>
+                    {saving ? '⏳...' : '💾 Guardar Borrador'}
+                </button>
+                <button className="btn btn-success" style={{flex:1}} onClick={generateCert}>
+                    📄 Generar Certificado
+                </button>
+                <button className="btn btn-primary" style={{flex:1}} onClick={() => handleSave(false)} disabled={saving}>
+                    {saving ? '⏳...' : '✓ Completar OT'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// Orders List
+function OrdersList({ onNew, onEdit }) {
+    const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [exporting, setExporting] = useState(false);
+
+    useEffect(() => {
+        const unsub = Storage.getOrders(o => { setOrders(o); setLoading(false); });
+        return () => unsub();
+    }, []);
+
+    const exportToExcel = () => {
+        if (orders.length === 0) {
+            alert('No hay órdenes para exportar');
+            return;
+        }
+        
+        setExporting(true);
+        
+        try {
+            const datos = orders.map(o => ({
+                'MARCA': o.marca || '',
+                'SERIE': o.serie || '',
+                'PSI': o.psi || '',
+                'LONGITUD': o.longitud || '',
+                'ROSCA ENTRADA': o.roscaEntrada || '',
+                'FECHA DE ENTRADA': o.fechaEntrada || '',
+                'FECHA DE CALIBRACION': o.fechaCalibracion || '',
+                'PRECINTO': o.precinto || '',
+                'ORIGEN': o.origen || '',
+                'DESTINO': o.destino || '',
+                'FECHA DE SALIDA': o.fechaSalida || '',
+                'OV': o.ov || '',
+                'REMITO': o.remito || ''
+            }));
+            
+            const XLSX = window.XLSX;
+            const ws = XLSX.utils.json_to_sheet(datos);
+            
+            ws['!cols'] = [
+                {wch: 15}, {wch: 15}, {wch: 10}, {wch: 12},
+                {wch: 15}, {wch: 18}, {wch: 20}, {wch: 12},
+                {wch: 20}, {wch: 20}, {wch: 18}, {wch: 12}, {wch: 12}
+            ];
+            
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Manguerotes');
+            
+            const fecha = new Date().toLocaleDateString('es-AR', {month: 'long', year: 'numeric'}).toUpperCase();
+            XLSX.writeFile(wb, `MANGUEROTES_${fecha}.xlsx`);
+            
+            alert(`✅ Exportados ${orders.length} manguerotes a Excel`);
+        } catch (error) {
+            console.error('Error exportando:', error);
+            alert('Error al exportar: ' + error.message);
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    if (loading) return <div className="card"><div className="loading"><div style={{fontSize:'48px'}}>⏳</div><p>Cargando órdenes...</p></div></div>;
+
+    if (!orders.length) return (
+        <div className="card">
+            <div className="empty-state">
+                <div style={{fontSize:'64px',marginBottom:'20px'}}>🔧</div>
+                <h3>No hay órdenes registradas</h3>
+                <p>Crea tu primera orden de trabajo</p>
+                <button className="btn btn-primary" style={{marginTop:'20px'}} onClick={onNew}>➕ Nueva Orden</button>
+            </div>
+        </div>
+    );
+
+    return (
+        <div>
+            <div style={{display:'flex', gap:'12px', marginBottom:'20px'}}>
+                <button className="btn btn-primary" style={{flex:1}} onClick={onNew}>
+                    ➕ Nueva Orden
+                </button>
+                <button className="btn btn-success" style={{flex:1}} onClick={exportToExcel} disabled={exporting}>
+                    {exporting ? '⏳ Exportando...' : '📊 Exportar a Excel'}
+                </button>
+            </div>
+            {orders.map(o => (
+                <div key={o.firestoreId||o.id} className="order-card" onClick={() => onEdit(o)}>
+                    <div className="order-header">
+                        <div className="order-title">{o.otNumber} — {o.serie || 'Sin serie'}</div>
+                        <span className={`order-badge ${o.status === 'complete' ? 'badge-complete' : 'badge-draft'}`}>
+                            {o.status === 'complete' ? 'Completo' : 'Borrador'}
+                        </span>
+                    </div>
+                    <div className="order-details">
+                        <div><span className="detail-label">Marca:</span> {o.marca || '-'}</div>
+                        <div><span className="detail-label">PSI:</span> {o.psi || '-'}</div>
+                        <div><span className="detail-label">Longitud:</span> {o.longitud || '-'}</div>
+                        <div><span className="detail-label">Fecha:</span> {o.fecha || '-'}</div>
+                        <div><span className="detail-label">Destino:</span> {o.destino || '-'}</div>
+                        <div><span className="detail-label">OV:</span> {o.ov || '-'}</div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// App
+function App() {
+    const [tab, setTab] = useState('list');
+    const [editing, setEditing] = useState(null);
+    const [toast, setToast] = useState(null);
+    const [online, setOnline] = useState(navigator.onLine);
+
+    useEffect(() => {
+        const on = () => setOnline(true);
+        const off = () => setOnline(false);
+        window.addEventListener('online', on);
+        window.addEventListener('offline', off);
+        return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+    }, []);
+
+    const showToast = (msg, type = 'success') => setToast({ msg, type });
+
+    const handleSave = async (order) => {
+        const ok = await Storage.saveOrder(order);
+        if (ok) {
+            showToast(order.status === 'draft' ? '💾 Borrador guardado' : '✅ Orden completada');
+            setTab('list'); setEditing(null);
+        } else {
+            showToast('Error al guardar', 'error');
+        }
+    };
+
+    return (
+        <div className="app-container">
+            <div className="app-header">
+                <h1>ManguerCheck</h1>
+                <div className="subtitle">Sistema de Calibración de Manguerotes</div>
+                <div className="sync-status">
+                    <div className="sync-dot" style={{background: online ? '#06D6A0' : '#FFB800'}}></div>
+                    {online ? 'Sincronizado ☁️' : 'Offline'}
+                </div>
+            </div>
+
+            <div className="nav-tabs">
+                <button className={`nav-tab ${tab==='list'?'active':''}`} onClick={() => setTab('list')}>📋 Órdenes</button>
+                <button className={`nav-tab ${tab==='new'?'active':''}`} onClick={() => { setEditing(null); setTab('new'); }}>➕ Nueva OT</button>
+            </div>
+
+            {tab === 'list'
+                ? <OrdersList onNew={() => { setEditing(null); setTab('new'); }} onEdit={o => { setEditing(o); setTab('new'); }} />
+                : <NewOrderForm onSave={handleSave} editingOrder={editing} />
+            }
+
+            {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+        </div>
+    );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
